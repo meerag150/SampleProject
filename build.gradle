@@ -1,0 +1,104 @@
+import org.gradle.plugins.ide.eclipse.model.AccessRule 
+buildscript {
+  repositories {
+   flatDir 
+                {
+                                dirs "gradle/Jars"              
+                }               
+  }
+  dependencies {
+    classpath "com.github.samueltbrown:gradle-cucumber-plugin:0.9"
+  }
+}
+
+apply plugin: 'java'
+apply plugin: 'com.github.samueltbrown.cucumber' 
+apply plugin: 'eclipse'
+
+eclipse.classpath.file.whenMerged {
+    def jre = entries.find { it.path.contains 'org.eclipse.jdt.launching.JRE_CONTAINER' }
+    jre.accessRules.add(new AccessRule('accessible', 'sun/misc/**'))
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+repositories 
+{
+    flatDir 
+                {
+                                dirs "gradle/Jars" 
+                }                 
+}
+
+dependencies 
+{
+    compile fileTree(include: ['*.*'], dir: 'gradle/Jars')
+    runtime fileTree(include: ['*.*'], dir: 'gradle/Jars')
+    testCompile fileTree(include: ['*.*'], dir: 'gradle/Jars')
+   	//cucumberRuntime name :'cucumber-java:1.2.2'
+} 
+
+
+cucumber {
+    sourceSets = [project.sourceSets.test]
+    //sourceSets = ['src/test', 'src/main']
+  }
+ 
+
+// copy reports from build to testresult folder
+task copyReports(type: Copy) {
+	def dateTime = new Date()
+	def currentDateTime = dateTime.format("yyyyMMdd")
+	
+	// copy cucumber-html-reports with date time
+    from 'build/reports/log4jReports'
+    into 'src/test/java/testResult/custom-report/log4jReports_' + currentDateTime
+} 
+
+task regressionTest() {
+    dependsOn assemble, compileTestJava
+    doLast {
+      	 def tagsToRun = "$System.env.RunTags"
+    	 if(tagsToRun.contains('@'))
+    	 	println  "On demand test"
+    	 else
+    		tagsToRun = '@Regression'
+
+        javaexec {
+            main = "com.generic.cucumberCLIExtender.CustomCucumberCLIExtender"
+            classpath = configurations.cucumberRuntime + sourceSets.main.output + sourceSets.test.output
+            args = ['--plugin', 'com.generic.extentReportListener.ExtentCucumberFormatter:src/test/java/testResult/extent-report/report.html', 
+            '--plugin', 'pretty',
+			'--plugin', 'html:src/test/java/testResult/cucumber-report',
+			'--plugin', 'junit:src/test/java/testResult/cucumber-report/cucumber.xml',
+			'--plugin', 'json:src/test/java/testResult/cucumber-report/cucumber.json', 
+            '--tags', tagsToRun,
+            '--glue', 'com.hooks', '--glue', 'com.stepdefinition','--glue','com.cucumber.listner', 
+            'src/test/resources'] 
+        }
+    }
+}
+task smokeTest() {
+    dependsOn assemble, compileTestJava
+    doLast {
+      	 def tagsToRun = "$System.env.RunTags"
+    	 if(tagsToRun.contains('@'))
+    	 	println  "On demand test"
+    	 else
+    		tagsToRun = '@Environment_Validation'
+
+        javaexec {
+            main = "com.generic.cucumberCLIExtender.CustomCucumberCLIExtender"
+            classpath = configurations.cucumberRuntime + sourceSets.main.output + sourceSets.test.output
+            args = ['--plugin', 'com.generic.extentReportListener.ExtentCucumberFormatter:src/test/java/testResult/extent-report/report.html', 
+            '--plugin', 'pretty',
+			'--plugin', 'html:src/test/java/testResult/cucumber-report',
+			'--plugin', 'junit:src/test/java/testResult/cucumber-report/cucumber.xml',
+			'--plugin', 'json:src/test/java/testResult/cucumber-report/cucumber.json', 
+            '--tags', tagsToRun,
+            '--glue', 'com.hooks', '--glue', 'com.stepdefinition','--glue','com.cucumber.listner', 
+            'src/test/resources'] 
+        }
+    }
+}
